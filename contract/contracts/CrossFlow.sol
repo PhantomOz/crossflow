@@ -37,6 +37,12 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         _;
     }
 
+    modifier onlyEnabledSender(uint64 _chainSelector, address _sender) {
+        if (s_chains[_chainSelector].xFlowAddress != _sender)
+            revert SenderNotEnabled(_sender);
+        _;
+    }
+
     modifier onlyRouter() {
         if (msg.sender != address(i_ccipRouter))
             revert InvalidRouter(msg.sender);
