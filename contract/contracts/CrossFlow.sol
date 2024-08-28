@@ -13,9 +13,27 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    enum PayFeesIn {
+        NATIVE,
+        LINK
+    }
+
     IRouterClient internal immutable i_ccipRouter;
     LinkTokenInterface internal immutable i_linkToken;
     uint64 private immutable i_currentChainSelector;
+
+    mapping(uint64 destChainSelector => xFlowDetails xFlowDetailsPerChain)
+        public s_chains;
+
+    struct xFlowDetails {
+        address xFlowAddress;
+    }
+
+    modifier onlyEnabledChain(uint64 _chainSelector) {
+        if (s_chains[_chainSelector].xFlowAddress == address(0))
+            revert ChainNotEnabled(_chainSelector);
+        _;
+    }
 
     constructor(
         address ccipRouterAddress,
