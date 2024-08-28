@@ -18,6 +18,8 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         LINK
     }
 
+    error InvalidRouter(address router);
+
     IRouterClient internal immutable i_ccipRouter;
     LinkTokenInterface internal immutable i_linkToken;
     uint64 private immutable i_currentChainSelector;
@@ -32,6 +34,12 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     modifier onlyEnabledChain(uint64 _chainSelector) {
         if (s_chains[_chainSelector].xFlowAddress == address(0))
             revert ChainNotEnabled(_chainSelector);
+        _;
+    }
+
+    modifier onlyRouter() {
+        if (msg.sender != address(i_ccipRouter))
+            revert InvalidRouter(msg.sender);
         _;
     }
 
@@ -111,7 +119,7 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         );
     }
 
-    /// @inheritdoc IAny2EVMMessageReceiver.sol
+    /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(
         Client.Any2EVMMessage calldata message
     )
