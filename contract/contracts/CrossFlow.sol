@@ -19,6 +19,12 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     }
 
     error InvalidRouter(address router);
+    error ChainNotEnabled(uint64 chainSelector);
+    error SenderNotEnabled(address sender);
+    error NotEnoughBalanceForFees(
+        uint256 currentBalance,
+        uint256 calculatedFees
+    );
 
     IRouterClient internal immutable i_ccipRouter;
     LinkTokenInterface internal immutable i_linkToken;
@@ -26,6 +32,23 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
 
     mapping(uint64 destChainSelector => xFlowDetails xFlowDetailsPerChain)
         public s_chains;
+
+    event ChainEnabled(uint64 chainSelector, address xFlowAddress);
+    event ChainDisabled(uint64 chainSelector);
+    event CrossChainSent(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint64 sourceChainSelector,
+        uint64 destinationChainSelector
+    );
+    event CrossChainReceived(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint64 sourceChainSelector,
+        uint64 destinationChainSelector
+    );
 
     struct xFlowDetails {
         address xFlowAddress;
