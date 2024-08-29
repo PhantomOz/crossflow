@@ -25,15 +25,20 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         uint256 currentBalance,
         uint256 calculatedFees
     );
+    error OperationNotAllowedOnCurrentChain(uint64 chainSelector);
 
     IRouterClient internal immutable i_ccipRouter;
     LinkTokenInterface internal immutable i_linkToken;
     uint64 private immutable i_currentChainSelector;
 
-    mapping(uint64 destChainSelector => xFlowDetails xFlowDetailsPerChain)
+    mapping(uint64 destChainSelector => XFlowDetails xFlowDetailsPerChain)
         public s_chains;
 
-    event ChainEnabled(uint64 chainSelector, address xFlowAddress);
+    event ChainEnabled(
+        uint64 chainSelector,
+        address xFlowAddress,
+        bytes ccipExtraArgs
+    );
     event ChainDisabled(uint64 chainSelector);
     event CrossChainSent(
         address from,
@@ -50,8 +55,9 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         uint64 destinationChainSelector
     );
 
-    struct xFlowDetails {
+    struct XFlowDetails {
         address xFlowAddress;
+        bytes ccipExtraArgsBytes;
     }
 
     modifier onlyEnabledChain(uint64 _chainSelector) {
@@ -72,6 +78,12 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         _;
     }
 
+    modifier onlyOtherChains(uint64 _chainSelector) {
+        if (_chainSelector == i_currentChainSelector)
+            revert OperationNotAllowedOnCurrentChain(_chainSelector);
+        _;
+    }
+
     constructor(
         address ccipRouterAddress,
         address linkTokenAddress,
@@ -81,6 +93,27 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         i_ccipRouter = IRouterClient(ccipRouterAddress);
         i_linkToken = LinkTokenInterface(linkTokenAddress);
         i_currentChainSelector = currentChainSelector;
+    }
+
+    function enableChain(
+        uint64 chainSelector,
+        address xFlowAddress,
+        bytes memory ccipExtraArgs
+    ) external onlyOwner onlyOtherChains(chainSelector) {
+        s_chains[chainSelector] = XFlowDetails({
+            xFlowAddress: xFlowAddress,
+            ccipExtraArgsBytes: ccipExtraArgs
+        });
+
+        emit ChainEnabled(chainSelector, xFlowAddress, ccipExtraArgs);
+    }
+
+    function disableChain(
+        uint64 chainSelector
+    ) external onlyOwner onlyOtherChains(chainSelector) {
+        delete s_chains[chainSelector];
+
+        emit ChainDisabled(chainSelector);
     }
 
     function crossChainTransferFrom(
@@ -95,14 +128,11 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         onlyEnabledChain(destinationChainSelector)
         returns (bytes32 messageId)
     {
-        string memory tokenUri = tokenURI(tokenId);
-        _burn(tokenId);
-
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(
-                s_chains[destinationChainSelector].xNftAddress
+                s_chains[destinationChainSelector].xFlowAddress
             ),
-            data: abi.encode(from, to, tokenId, tokenUri),
+            data: abi.encode(from, to, tokenId),
             tokenAmounts: new Client.EVMTokenAmount[](0),
             extraArgs: s_chains[destinationChainSelector].ccipExtraArgsBytes,
             feeToken: payFeesIn == PayFeesIn.LINK
