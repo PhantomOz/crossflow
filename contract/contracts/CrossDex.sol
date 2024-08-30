@@ -92,6 +92,37 @@ contract CrossDex is ReentrancyGuard, OwnerIsCreator {
         return ((uint256(_price) * NEW_PRECISION) * _amount) / PRECISION;
     }
 
+    function setTokenData(
+        address _token,
+        TokenData calldata _tokenData
+    ) external onlyOwner {
+        s_tokenDatas[_token] = _tokenData;
+    }
+
+    function setQuotePercent(uint8 _percent) external onlyOwner {
+        s_quotePercent = _percent;
+    }
+
+    function depositWeth(address _token) external payable {
+        IWrappedNative(_token).deposit{value: msg.value}();
+    }
+
+    /// note: this function will be removed when deploying to mainnet. It is only here to recover testnet funds incase we make changes and redeploy.
+    function withdrawToken(
+        address _token
+    ) external onlyOwner returns (bool _success) {
+        if (_token == address(1)) {
+            (_success, ) = payable(msg.sender).call{
+                value: address(this).balance
+            }("");
+        } else {
+            uint256 balance = IERC20(_token).balanceOf(address(this));
+            _success = IERC20(_token).transfer(msg.sender, balance);
+        }
+    }
+
+    receive() external payable {}
+
     function _notLargerThanPercent(
         address _token,
         uint256 _amount
