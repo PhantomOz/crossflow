@@ -142,6 +142,45 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         emit ChainDisabled(chainSelector);
     }
 
+    function enableAsset(
+        string memory asset,
+        address _address
+    ) external onlyOwner {
+        assetAddress[asset] = _address;
+    }
+
+    function getFee(
+        uint64 destinationChainSelector,
+        address from,
+        address to,
+        address token,
+        uint256 amount,
+        TokenType tokenType,
+        PayFeesIn payFeesIn,
+        string calldata descSymbol
+    ) public view returns (uint256 fees, Client.EVM2AnyMessage memory message) {
+        Client.EVMTokenAmount[]
+            memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(token),
+            amount: amount
+        });
+
+        message = Client.EVM2AnyMessage({
+            receiver: abi.encode(
+                s_chains[destinationChainSelector].xFlowAddress
+            ),
+            data: abi.encode(to, from, tokenType, descSymbol),
+            tokenAmounts: tokenAmounts,
+            extraArgs: s_chains[destinationChainSelector].ccipExtraArgsBytes,
+            feeToken: payFeesIn == PayFeesIn.LINK
+                ? address(i_linkToken)
+                : address(0)
+        });
+
+        fees = i_ccipRouter.getFee(destinationChainSelector, message);
+    }
+
     function crossChainTransferFrom(
         uint64 destinationChainSelector,
         address to,
@@ -182,20 +221,17 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         }
 
-        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(
-                s_chains[destinationChainSelector].xFlowAddress
-            ),
-            data: abi.encode(to, msg.sender, tokenType, descSymbol),
-            tokenAmounts: new Client.EVMTokenAmount[](0),
-            extraArgs: s_chains[destinationChainSelector].ccipExtraArgsBytes,
-            feeToken: payFeesIn == PayFeesIn.LINK
-                ? address(i_linkToken)
-                : address(0)
-        });
-
         // Get the fee required to send the CCIP message
-        uint256 fees = i_ccipRouter.getFee(destinationChainSelector, message);
+        (uint256 fees, Client.EVM2AnyMessage memory message) = getFee(
+            destinationChainSelector,
+            msg.sender,
+            to,
+            token,
+            amount,
+            tokenType,
+            payFeesIn,
+            descSymbol
+        );
 
         if (payFeesIn == PayFeesIn.LINK) {
             if (fees > i_linkToken.balanceOf(address(msg.sender)))
