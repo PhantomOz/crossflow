@@ -18,6 +18,13 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         LINK
     }
 
+    enum TokenType {
+        SUPPORTED,
+        NOTSUPPORTED,
+        WRAPPED,
+        NATIVE
+    }
+
     error InvalidRouter(address router);
     error ChainNotEnabled(uint64 chainSelector);
     error SenderNotEnabled(address sender);
@@ -41,11 +48,14 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     );
     event ChainDisabled(uint64 chainSelector);
     event CrossChainSent(
-        address from,
-        address to,
-        uint256 tokenId,
-        uint64 sourceChainSelector,
-        uint64 destinationChainSelector
+        bytes32 indexed messageId, // The unique ID of the CCIP message.
+        uint64 indexed destinationChainSelector, // The chain selector of the destination chain.
+        address indexed sender, // The address of the sender.
+        address to, // The address of the receiver.
+        address token, // The token address that was transferred.
+        uint256 tokenAmount, // The token amount that was transferred.
+        address feeToken, // the token address used to pay CCIP fees.
+        uint256 fees // The fees paid for sending the message.
     );
     event CrossChainReceived(
         address from,
@@ -117,11 +127,14 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     }
 
     function crossChainTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId,
         uint64 destinationChainSelector,
-        PayFeesIn payFeesIn
+        address receiver,
+        address to,
+        address token,
+        uint256 amount,
+        TokenType tokenType,
+        PayFeesIn payFeesIn,
+        string calldata descSymbol
     )
         external
         nonReentrant
@@ -132,7 +145,7 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
             receiver: abi.encode(
                 s_chains[destinationChainSelector].xFlowAddress
             ),
-            data: abi.encode(from, to, tokenId),
+            data: abi.encode(to, msg.sender, tokenType, descSymbol),
             tokenAmounts: new Client.EVMTokenAmount[](0),
             extraArgs: s_chains[destinationChainSelector].ccipExtraArgsBytes,
             feeToken: payFeesIn == PayFeesIn.LINK
@@ -144,14 +157,15 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         uint256 fees = i_ccipRouter.getFee(destinationChainSelector, message);
 
         if (payFeesIn == PayFeesIn.LINK) {
-            if (fees > i_linkToken.balanceOf(address(this)))
+            if (fees > i_linkToken.balanceOf(address(msg.sender)))
                 revert NotEnoughBalanceForFees(
-                    i_linkToken.balanceOf(address(this)),
+                    i_linkToken.balanceOf(address(msg.sender)),
                     fees
                 );
 
             // Approve the Router to transfer LINK tokens on contract's behalf. It will spend the fees in LINK
             i_linkToken.approve(address(i_ccipRouter), fees);
+            i_linkToken.transferFrom(msg.sender, address(this), fees);
 
             // Send the message through the router and store the returned message ID
             messageId = i_ccipRouter.ccipSend(
@@ -170,11 +184,14 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         }
 
         emit CrossChainSent(
-            from,
+            messageId,
+            destinationChainSelector,
+            msg.sender,
             to,
-            tokenId,
-            i_currentChainSelector,
-            destinationChainSelector
+            token,
+            amount,
+            payFeesIn == PayFeesIn.LINK ? address(i_linkToken) : address(0),
+            fees
         );
     }
 
