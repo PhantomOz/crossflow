@@ -9,6 +9,8 @@ import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/
 import {IAny2EVMMessageReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IAny2EVMMessageReceiver.sol";
 import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
+import {IWrappedNative} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IWrappedNative.sol";
+import {CrossDex} from "./CrossDex.sol";
 
 contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -36,10 +38,14 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
 
     IRouterClient internal immutable i_ccipRouter;
     LinkTokenInterface internal immutable i_linkToken;
+    IWrappedNative public immutable i_weth;
+    IERC20 public immutable i_usdcToken;
+    address payable private i_dex;
     uint64 private immutable i_currentChainSelector;
 
     mapping(uint64 destChainSelector => XFlowDetails xFlowDetailsPerChain)
         public s_chains;
+    mapping(string => address) public assetAddress;
 
     event ChainEnabled(
         uint64 chainSelector,
@@ -48,21 +54,22 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     );
     event ChainDisabled(uint64 chainSelector);
     event CrossChainSent(
-        bytes32 indexed messageId, // The unique ID of the CCIP message.
-        uint64 indexed destinationChainSelector, // The chain selector of the destination chain.
-        address indexed sender, // The address of the sender.
-        address to, // The address of the receiver.
-        address token, // The token address that was transferred.
-        uint256 tokenAmount, // The token amount that was transferred.
-        address feeToken, // the token address used to pay CCIP fees.
-        uint256 fees // The fees paid for sending the message.
+        bytes32 indexed messageId,
+        uint64 indexed destinationChainSelector,
+        address indexed sender,
+        address to,
+        address token,
+        uint256 tokenAmount,
+        address feeToken,
+        uint256 fees
     );
     event CrossChainReceived(
-        address from,
-        address to,
-        uint256 tokenId,
-        uint64 sourceChainSelector,
-        uint64 destinationChainSelector
+        bytes32 indexed _messageId,
+        uint64 indexed _sourceChainSelector,
+        address _sender,
+        address indexed _to,
+        address token,
+        uint256 tokenAmount
     );
 
     struct XFlowDetails {
@@ -97,12 +104,21 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
     constructor(
         address ccipRouterAddress,
         address linkTokenAddress,
-        uint64 currentChainSelector
+        uint64 currentChainSelector,
+        address usdcToken,
+        address dex
     ) {
         if (ccipRouterAddress == address(0)) revert InvalidRouter(address(0));
         i_ccipRouter = IRouterClient(ccipRouterAddress);
         i_linkToken = LinkTokenInterface(linkTokenAddress);
         i_currentChainSelector = currentChainSelector;
+        i_weth = IWrappedNative(
+            CCIPRouter(ccipRouterAddress).getWrappedNative()
+        );
+        i_weth.approve(ccipRouterAddress, type(uint256).max);
+        i_dex = payable(dex);
+        i_weth.approve(dex, type(uint256).max);
+        i_usdcToken = IERC20(usdcToken);
     }
 
     function enableChain(
@@ -128,7 +144,6 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
 
     function crossChainTransferFrom(
         uint64 destinationChainSelector,
-        address receiver,
         address to,
         address token,
         uint256 amount,
@@ -141,6 +156,32 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         onlyEnabledChain(destinationChainSelector)
         returns (bytes32 messageId)
     {
+        address fromToken = token;
+
+        if (tokenType == TokenType.NATIVE) {
+            i_weth.deposit{value: amount}();
+        }
+
+        if (tokenType == TokenType.WRAPPED) {
+            i_weth.transferFrom(msg.sender, address(this), amount);
+        }
+
+        if (tokenType == TokenType.NOTSUPPORTED) {
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(token).approve(address(i_dex), amount);
+            (bool success, uint256 swapAmount) = CrossDex(i_dex).swap(
+                token,
+                address(i_usdcToken),
+                amount
+            );
+            token = address(i_usdcToken);
+            amount = swapAmount;
+        }
+
+        if (tokenType == TokenType.SUPPORTED) {
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        }
+
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(
                 s_chains[destinationChainSelector].xFlowAddress
@@ -188,7 +229,7 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
             destinationChainSelector,
             msg.sender,
             to,
-            token,
+            fromToken,
             amount,
             payFeesIn == PayFeesIn.LINK ? address(i_linkToken) : address(0),
             fees
@@ -210,20 +251,75 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
             abi.decode(message.sender, (address))
         )
     {
+        bytes32 messageId = message.messageId;
         uint64 sourceChainSelector = message.sourceChainSelector;
         (
-            address from,
             address to,
-            uint256 tokenId,
-            string memory tokenUri
-        ) = abi.decode(message.data, (address, address, uint256, string));
+            address from,
+            TokenType tokenType,
+            string memory descSymbol
+        ) = abi.decode(message.data, (address, address, TokenType, string));
+        address token = message.destTokenAmounts[0].token;
+        uint256 tokenAmount = message.destTokenAmounts[0].amount;
+
+        address destAddress = assetAddress[descSymbol];
+
+        if (
+            (TokenType.NATIVE == tokenType || TokenType.WRAPPED == tokenType) &&
+            destAddress == address(1)
+        ) {
+            i_weth.withdraw(tokenAmount);
+            (bool success, ) = payable(to).call{value: tokenAmount}("");
+            if (!success) {
+                i_weth.deposit{value: tokenAmount}();
+                i_weth.transfer(to, tokenAmount);
+            }
+        }
+
+        if (
+            (TokenType.SUPPORTED == tokenType ||
+                TokenType.NOTSUPPORTED == tokenType) &&
+            destAddress == address(1)
+        ) {
+            IERC20(token).approve(address(i_dex), tokenAmount);
+            (bool success, uint256 swapAmount) = CrossDex(i_dex).swap(
+                token,
+                destAddress,
+                tokenAmount
+            );
+            (bool _success, ) = payable(to).call{value: tokenAmount}("");
+            if (!_success) {
+                i_weth.deposit{value: tokenAmount}();
+                i_weth.transfer(to, tokenAmount);
+            }
+        }
+
+        if (
+            (TokenType.SUPPORTED == tokenType ||
+                TokenType.NOTSUPPORTED == tokenType) && destAddress != token
+        ) {
+            IERC20(token).approve(address(i_dex), tokenAmount);
+            (bool success, uint256 swapAmount) = CrossDex(i_dex).swap(
+                token,
+                destAddress,
+                tokenAmount
+            );
+            IERC20(destAddress).transfer(to, tokenAmount);
+        } else {
+            IERC20(token).transfer(to, tokenAmount);
+        }
 
         emit CrossChainReceived(
+            messageId,
+            sourceChainSelector,
             from,
             to,
-            tokenId,
-            sourceChainSelector,
-            i_currentChainSelector
+            token,
+            tokenAmount
         );
     }
+}
+
+interface CCIPRouter {
+    function getWrappedNative() external view returns (address);
 }
