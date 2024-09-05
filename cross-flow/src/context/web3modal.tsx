@@ -14,6 +14,22 @@ const mainnet = {
     rpcUrl: 'https://cloudflare-eth.com'
 }
 
+const sepolia = {
+    chainId: 11155111,
+    name: 'Ethereum Sepolia',
+    currency: 'ETH',
+    explorerUrl: 'https://sepolia.etherscan.io',
+    rpcUrl: 'https://sepolia.drpc.org'
+}
+
+const baseSepolia = {
+    chainId: 84532,
+    name: 'Base Sepolia',
+    currency: 'ETH',
+    explorerUrl: 'https://sepolia.basescan.org',
+    rpcUrl: 'https://sepolia.base.org'
+}
+
 // 3. Create a metadata object
 const metadata = {
     name: 'My Website',
@@ -37,9 +53,10 @@ const ethersConfig = defaultConfig({
 // 5. Create a AppKit instance
 createWeb3Modal({
     ethersConfig,
-    chains: [mainnet],
+    chains: [sepolia, baseSepolia],
     projectId,
-    enableAnalytics: true // Optional - defaults to your Cloud configuration
+    enableAnalytics: true, // Optional - defaults to your Cloud configuration
+    defaultChain: sepolia
 })
 
 export function AppKit({ children }: { children: any }) {
