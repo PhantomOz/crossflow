@@ -4,6 +4,7 @@ import { Gabarito } from 'next/font/google'
 import { Comfortaa } from 'next/font/google'
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { AppKit } from "@/context/web3modal";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -43,7 +44,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={cn('antialiased', ibm_plex_mono_heading.variable, ibm_plex_mono_body.variable)}>{children}</body>
+      <body className={cn('antialiased', ibm_plex_mono_heading.variable, ibm_plex_mono_body.variable)}>
+        <AppKit>
+          {children}
+        </AppKit>
+      </body>
     </html>
   );
 }
