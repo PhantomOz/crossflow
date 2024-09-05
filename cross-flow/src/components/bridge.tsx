@@ -1,3 +1,4 @@
+'use client';
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
@@ -6,8 +7,45 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Drawer, DrawerTrigger, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer"
+import { useSwitchNetwork, useWeb3ModalAccount } from "@web3modal/ethers/react"
+import { useEffect, useState } from "react"
+import { chainCurrency, ToChain, toChainSelector } from "@/hooks/useBridge";
 
 export function Bridge() {
+  const { switchNetwork } = useSwitchNetwork();
+  const { address, chainId, isConnected } = useWeb3ModalAccount()
+  const [toAddress, setToAddress] = useState<`0x${string}` | undefined>();
+  const [token, setToken] = useState<string>();
+  const [toChains, setToChains] = useState<ToChain[]>([]);
+  const [amount, setAmount] = useState<number>(0);
+  const [payFeesIn, setPayFeeIn] = useState('0');
+  const [tokens, setTokens] = useState<string[]>([]);
+  const [toNetwork, setToNetwork] = useState('84532');
+
+
+  useEffect(() => {
+    setToAddress(address);
+  }, [isConnected]);
+
+  useEffect(() => {
+    const chainSelector = toChainSelector[chainId as number];
+    setToChains(chainSelector)
+    setToNetwork(chainSelector[0].id);
+    setTokens(chainCurrency[chainId as number]);
+  }, [isConnected, chainId]);
+
+  const handleFromNetworkChange = (e: string) => {
+    switchNetwork(Number(e));
+  };
+  const handleToNetworkChange = (e: string) => {
+    setToNetwork(e);
+    setTokens(chainCurrency[e]);
+  };
+
+  const handleTokenChange = (e: string) => {
+    setToken(e);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="bg-background border-b px-4 sm:px-6 flex items-center justify-between h-16">
