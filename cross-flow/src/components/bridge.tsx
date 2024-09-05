@@ -16,25 +16,24 @@ export function Bridge() {
           <span className="font-semibold text-lg">CrossFlow</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Button variant="outline">
-            <WalletIcon className="mr-2 h-4 w-4" />
-            Connect Wallet
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="flex items-center gap-2">
                 <BitcoinIcon className="h-4 w-4" />
-                <span>Ethereum</span>
+                <span>Ethereum Sepolia</span>
                 <ChevronDownIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Ethereum</DropdownMenuItem>
-              <DropdownMenuItem>Polygon</DropdownMenuItem>
-              <DropdownMenuItem>Avalanche</DropdownMenuItem>
-              <DropdownMenuItem>Arbitrum</DropdownMenuItem>
+              <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
+              <DropdownMenuItem>Base Sepolia</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="outline">
+            <WalletIcon className="mr-2 h-4 w-4" />
+            Connect Wallet
+          </Button>
+          <w3m-button />
         </div>
       </header>
       <main className="flex-1 bg-muted/40 py-12 px-4 sm:px-6">
@@ -52,15 +51,13 @@ export function Bridge() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full flex items-center justify-between">
-                          <span>Ethereum</span>
+                          <span>Ethereum Sepolia</span>
                           <ChevronDownIcon className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
-                        <DropdownMenuItem>Ethereum</DropdownMenuItem>
-                        <DropdownMenuItem>Polygon</DropdownMenuItem>
-                        <DropdownMenuItem>Avalanche</DropdownMenuItem>
-                        <DropdownMenuItem>Arbitrum</DropdownMenuItem>
+                        <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
+                        <DropdownMenuItem>Base Sepolia</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -69,15 +66,13 @@ export function Bridge() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full flex items-center justify-between">
-                          <span>Polygon</span>
+                          <span>Base Sepolia</span>
                           <ChevronDownIcon className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
-                        <DropdownMenuItem>Ethereum</DropdownMenuItem>
-                        <DropdownMenuItem>Polygon</DropdownMenuItem>
-                        <DropdownMenuItem>Avalanche</DropdownMenuItem>
-                        <DropdownMenuItem>Arbitrum</DropdownMenuItem>
+                        <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
+                        <DropdownMenuItem>Base Sepolia</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -108,25 +103,25 @@ export function Bridge() {
                       <DropdownMenuItem>
                         <div className="flex items-center gap-2">
                           <div className="rounded-full w-6 h-6 bg-accent text-accent-foreground flex items-center justify-center">
-                            MATIC
+                            DAI
                           </div>
-                          <span>Polygon</span>
+                          <span>DAI</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem>
                         <div className="flex items-center gap-2">
                           <div className="rounded-full w-6 h-6 bg-success text-success-foreground flex items-center justify-center">
-                            AVAX
+                            LINK
                           </div>
-                          <span>Avalanche</span>
+                          <span>LINK</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem>
                         <div className="flex items-center gap-2">
                           <div className="rounded-full w-6 h-6 bg-warning text-warning-foreground flex items-center justify-center">
-                            ARB
+                            WETH
                           </div>
-                          <span>Arbitrum</span>
+                          <span>WETH</span>
                         </div>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
