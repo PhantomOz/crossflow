@@ -92,7 +92,7 @@ The application will be available at `http://localhost:3000`.
    ```
 2. Deploy the contracts to a local or test network:
    ```bash
-   npx hardhat run scripts/deploy.js --network <network_name>
+   npx hardhat ignition deploy ignition/modules/CrossFlow.ts --network <network_name> --verify
    ```
 
 Replace `<network_name>` with your desired network (e.g., `localhost`, `sepolia`, `baseSepolia`).
