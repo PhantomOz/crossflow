@@ -57,6 +57,7 @@ export const chainCurrency: any = {
     84532: ['DAI', 'USDC', 'LINK', 'WETH', 'ETH']
 }
 
+
 export interface ToChain {
     id: string;
     name: string;
