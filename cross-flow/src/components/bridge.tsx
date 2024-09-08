@@ -9,7 +9,7 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/comp
 import { Drawer, DrawerTrigger, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer"
 import { useSwitchNetwork, useWeb3ModalAccount } from "@web3modal/ethers/react"
 import { useEffect, useState } from "react"
-import { chainCurrency, ToChain, toChainSelector } from "@/hooks/useBridge";
+import { CCIPChainSelector, chainAddress, chainCurrency, MultiChainTokenAddress, ToChain, toChainSelector, useBridge } from "@/hooks/useBridge";
 
 export function Bridge() {
   const { switchNetwork } = useSwitchNetwork();
@@ -17,11 +17,12 @@ export function Bridge() {
   const [toAddress, setToAddress] = useState<`0x${string}` | undefined>();
   const [token, setToken] = useState<string>();
   const [toChains, setToChains] = useState<ToChain[]>([]);
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<number>();
   const [payFeesIn, setPayFeeIn] = useState('0');
   const [tokens, setTokens] = useState<string[]>([]);
   const [toNetwork, setToNetwork] = useState('84532');
-
+  const [networkName, setNetworkName] = useState('Ethereum Sepolia');
+  const { sendToken, getFee } = useBridge();
 
   useEffect(() => {
     setToAddress(address);
@@ -30,12 +31,17 @@ export function Bridge() {
   useEffect(() => {
     const chainSelector = toChainSelector[chainId as number];
     setToChains(chainSelector)
-    setToNetwork(chainSelector[0].id);
-    setTokens(chainCurrency[chainId as number]);
+    if (chainSelector) {
+
+      setToNetwork(chainSelector[0].id);
+      setTokens(chainCurrency[chainId as number]);
+      setToken(chainCurrency[chainId as number][0]);
+    }
   }, [isConnected, chainId]);
 
-  const handleFromNetworkChange = (e: string) => {
+  const handleFromNetworkChange = (e: string, name: string) => {
     switchNetwork(Number(e));
+    setNetworkName(name);
   };
   const handleToNetworkChange = (e: string) => {
     setToNetwork(e);
@@ -45,6 +51,11 @@ export function Bridge() {
   const handleTokenChange = (e: string) => {
     setToken(e);
   };
+
+  const handleSendToken = async (e: any) => {
+    e.preventDefault();
+    await sendToken(CCIPChainSelector[toNetwork], toAddress as `0x${string}`, MultiChainTokenAddress[toNetwork][token as string].address, Number(amount), 3, 0, token as string)
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -58,13 +69,13 @@ export function Bridge() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="flex items-center gap-2">
                 <BitcoinIcon className="h-4 w-4" />
-                <span>Ethereum Sepolia</span>
+                <span>{networkName}</span>
                 <ChevronDownIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
-              <DropdownMenuItem>Base Sepolia</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFromNetworkChange('11155111', 'Ethereum Sepolia')}>Ethereum Sepolia</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFromNetworkChange('84532', 'Base Sepolia')}>Base Sepolia</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline">
@@ -89,13 +100,13 @@ export function Bridge() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full flex items-center justify-between">
-                          <span>Ethereum Sepolia</span>
+                          <span>{networkName}</span>
                           <ChevronDownIcon className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
-                        <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
-                        <DropdownMenuItem>Base Sepolia</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleFromNetworkChange('11155111', 'Ethereum Sepolia')}>Ethereum Sepolia</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleFromNetworkChange('84532', 'Base Sepolia')}>Base Sepolia</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -104,13 +115,14 @@ export function Bridge() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full flex items-center justify-between">
-                          <span>Base Sepolia</span>
+                          <span>{toChains && toChains[0]?.name}</span>
                           <ChevronDownIcon className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
-                        <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
-                        <DropdownMenuItem>Base Sepolia</DropdownMenuItem>
+                        {/* <DropdownMenuItem>Ethereum Sepolia</DropdownMenuItem>
+                        <DropdownMenuItem>Base Sepolia</DropdownMenuItem> */}
+                        {toChains?.map((chain: any, index: any) => <DropdownMenuItem key={index} onClick={() => handleFromNetworkChange('11155111', chain.name)} >{chain.name}</DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -122,54 +134,30 @@ export function Bridge() {
                       <Button variant="outline" className="w-full flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="rounded-full w-6 h-6 bg-primary text-primary-foreground flex items-center justify-center">
-                            ETH
+                            {token}
                           </div>
-                          <span>Ethereum</span>
+                          <span>{token}</span>
                         </div>
                         <ChevronDownIcon className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      <DropdownMenuItem>
+                      {tokens?.map((token: any, index: any) => <DropdownMenuItem key={index} onClick={() => handleTokenChange(token)}>
                         <div className="flex items-center gap-2">
                           <div className="rounded-full w-6 h-6 bg-primary text-primary-foreground flex items-center justify-center">
-                            ETH
+                            {token}
                           </div>
-                          <span>Ethereum</span>
+                          <span>{token}</span>
                         </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-full w-6 h-6 bg-accent text-accent-foreground flex items-center justify-center">
-                            DAI
-                          </div>
-                          <span>DAI</span>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-full w-6 h-6 bg-success text-success-foreground flex items-center justify-center">
-                            LINK
-                          </div>
-                          <span>LINK</span>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-full w-6 h-6 bg-warning text-warning-foreground flex items-center justify-center">
-                            WETH
-                          </div>
-                          <span>WETH</span>
-                        </div>
-                      </DropdownMenuItem>
+                      </DropdownMenuItem>)}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" type="number" placeholder="0.0" />
+                  <Input id="amount" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
                 </div>
-                <Button className="w-full">Bridge Tokens</Button>
+                <Button className="w-full" onClick={handleSendToken}>Bridge Tokens</Button>
               </form>
             </CardContent>
           </Card>

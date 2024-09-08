@@ -11,3 +11,11 @@ export const getTokenContract = (providerOrSigner: any, contractAddress: any) =>
     TokenAbi as InterfaceAbi,
     providerOrSigner
   );
+
+export const getProvider = (provider: any) => {
+  if (provider) {
+    return new ethers.BrowserProvider(provider);
+  } else {
+    console.log("No Provider");
+  }
+};

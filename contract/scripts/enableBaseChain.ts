@@ -19,8 +19,8 @@ async function main() {
   const wallet = new Wallet(privateKey);
   const signer = wallet.connect(provider);
 
-  const crossFlowAddressEthereumSepolia = `0x472B67fc8d8C9f0276E6DFb402891936dee146A3`;
-  const crossFlowAddressBaseSepolia = `0xe12BD3496ff2aa98f1B087F4320ceBfBDbD1Df3a`;
+  const crossFlowAddressEthereumSepolia = `0xD2ba3C9bc4a8dd5C2c770635BE3A48ae24b14dd3`;
+  const crossFlowAddressBaseSepolia = `0xdE6788f932c08697b8B97B5d5efcf649076b168e`;
   const chainSelectorBaseSepolia = BigInt(16015286601757825753);
   const ccipExtraArgs = `0x97a657c90000000000000000000000000000000000000000000000000000000000030d40`;
 

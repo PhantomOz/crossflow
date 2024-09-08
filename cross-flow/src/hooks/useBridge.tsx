@@ -1,6 +1,6 @@
-import { getContract } from "@/context/contracts";
+import { getContract, getProvider } from "@/context/contracts";
 import { useWeb3ModalAccount, useWeb3ModalProvider } from "@web3modal/ethers/react";
-import { BrowserProvider, Eip1193Provider } from "ethers";
+import { BrowserProvider, Eip1193Provider, parseEther, parseUnits, WeiPerEther } from "ethers";
 import { useEffect, useState } from "react";
 
 export function useBridge() {
@@ -13,13 +13,26 @@ export function useBridge() {
             setContractAddress(chainAddress[chainId]);
     }, [chainId]);
 
-    async function sendToken(chainSelector: BigInt, to: `0x${string}`, token: `0x${string}`, amount: BigInt, tokenType: number, payFeesIn: number, symbol: string) {
+    async function sendToken(chainSelector: BigInt, to: `0x${string}`, token: `0x${string}`, amount: number, tokenType: number, payFeesIn: number, symbol: string) {
+        console.log(chainSelector, to, token, amount, tokenType, payFeesIn, symbol);
+        const ethersProvider = await getProvider(walletProvider);
+        const signer = await ethersProvider?.getSigner();
+        console.log(signer);
+        const contract = await getContract(signer, contractAddress);
+        if (contract.interface.hasFunction('crossChainTransferFrom')) {
+            await contract.crossChainTransferFrom(BigInt(Number(chainSelector)), to, token, parseUnits(String(amount), 18), tokenType, payFeesIn, symbol, { value: parseEther(String(amount)) });
+        } else {
+            console.log('Functions does not exist')
+        }
+    }
+
+    async function getFee(chainSelector: BigInt, to: `0x${string}`, token: `0x${string}`, amount: BigInt, tokenType: number, payFeesIn: number, symbol: string) {
         const ethersProvider = new BrowserProvider(walletProvider as Eip1193Provider)
         const signer = await ethersProvider.getSigner();
         const contract = await getContract(signer, contractAddress);
         await contract.crossChainTransferFrom(chainSelector, to, token, amount, tokenType, payFeesIn, symbol);
     }
-    return { sendToken };
+    return { sendToken, getFee };
 }
 
 export const toChainSelector: any = {
@@ -33,7 +46,7 @@ export const toChainSelector: any = {
     84532: [
         {
             id: "11155111",
-            name: "Sepolia",
+            name: "Ethereum Sepolia",
         },
     ],
 
@@ -50,8 +63,8 @@ export interface ToChain {
 }
 
 export const chainAddress: any = {
-    11155111: `0x0d36DD97b829069b48F97190DA264b87C3558e3b`,
-    84532: `0xbb3D975B2F00Be37CBCBC5917649Fe7f9E30fFA3`,
+    11155111: `0xD2ba3C9bc4a8dd5C2c770635BE3A48ae24b14dd3`,
+    84532: `0xdE6788f932c08697b8B97B5d5efcf649076b168e`,
 }
 
 export const CCIPChainSelector: any = {

@@ -191,6 +191,7 @@ contract CrossFlow is IAny2EVMMessageReceiver, OwnerIsCreator, ReentrancyGuard {
         string calldata descSymbol
     )
         external
+        payable
         nonReentrant
         onlyEnabledChain(destinationChainSelector)
         returns (bytes32 messageId)
